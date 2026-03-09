@@ -2,21 +2,27 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { albums } from '../data/catalog';
 import AudioPreview from '../components/AudioPreview';
-import { searchTrack } from '../services/itunes';
+import { searchAlbumTracks } from '../services/itunes';
 
 const AlbumDetail = () => {
   const { id } = useParams();
   const album = albums.find(a => a.id === id);
-  const [prefetchStarted, setPrefetchStarted] = useState(false);
+  const [trackMap, setTrackMap] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Prefetch all previews in the background (with concurrency control)
   useEffect(() => {
-    if (!album || prefetchStarted) return;
-    setPrefetchStarted(true);
-    album.songs.forEach(song => {
-      searchTrack(album.artist, song.title).catch(() => {});
-    });
-  }, [album, prefetchStarted]);
+    if (!album) return;
+    setLoading(true);
+    searchAlbumTracks(album.artist, album.title)
+      .then(map => {
+        setTrackMap(map || {});
+        setLoading(false);
+      })
+      .catch(() => {
+        setTrackMap({});
+        setLoading(false);
+      });
+  }, [album]);
 
   if (!album) {
     return (
@@ -33,30 +39,41 @@ const AlbumDetail = () => {
         <Link to="/" className="back-link">← Back to Albums</Link>
         
         <div className="album-header">
-          <img 
-            src={album.cover} 
-            alt={album.title}
-            className="album-cover"
-          />
+          <img src={album.cover} alt={album.title} className="album-cover" />
           <div className="album-info">
             <div className="album-artist">{album.artist}</div>
             <h1 className="album-title">{album.title}</h1>
             <div className="album-year">{album.year}</div>
-            {album.description && (
-              <p className="album-description">{album.description}</p>
-            )}
+            {album.description && <p className="album-description">{album.description}</p>}
           </div>
         </div>
 
         <div className="tracklist">
-          {album.songs.map((song, index) => (
-            <AudioPreview 
-              key={index}
-              song={song}
-              albumArtist={album.artist}
-              index={index}
-            />
-          ))}
+          {loading ? (
+            // Show skeleton loaders while fetching
+            Array(album.songs.length).fill(0).map((_, i) => (
+              <div key={i} className="track-row skeleton">
+                <div className="skeleton-number"></div>
+                <div className="skeleton-title"></div>
+                <div className="skeleton-duration"></div>
+              </div>
+            ))
+          ) : (
+            album.songs.map((song, index) => {
+              // Normalize song title for matching
+              const normalizedSong = song.title.toLowerCase().replace(/[^\w\s]/g, '');
+              const previewUrl = trackMap?.[normalizedSong] || null;
+              return (
+                <AudioPreview
+                  key={index}
+                  song={song}
+                  albumArtist={album.artist}
+                  index={index}
+                  previewUrl={previewUrl}
+                />
+              );
+            })
+          )}
         </div>
       </div>
     </div>
