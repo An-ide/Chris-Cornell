@@ -4,24 +4,47 @@ import { albums } from '../data/catalog';
 import AudioPreview from '../components/AudioPreview';
 import { searchAlbumTracks } from '../services/itunes';
 
+// Helper to find the best matching track preview
+const findBestMatch = (songTitle, tracks) => {
+  if (!tracks || tracks.length === 0) return null;
+
+  const normalizedSong = songTitle.toLowerCase().replace(/[^\w\s]/g, '').trim();
+
+  // 1. Exact match
+  for (let track of tracks) {
+    if (track.normalizedTitle === normalizedSong) {
+      return track.previewUrl;
+    }
+  }
+
+  // 2. Song title is contained in track title (e.g., "Black Hole Sun" in "Black Hole Sun (Remastered)")
+  for (let track of tracks) {
+    if (track.normalizedTitle.includes(normalizedSong)) {
+      return track.previewUrl;
+    }
+  }
+
+  // 3. Track title is contained in song title (unlikely but possible)
+  for (let track of tracks) {
+    if (normalizedSong.includes(track.normalizedTitle)) {
+      return track.previewUrl;
+    }
+  }
+
+  // 4. No match
+  return null;
+};
+
 const AlbumDetail = () => {
   const { id } = useParams();
   const album = albums.find(a => a.id === id);
-  const [trackMap, setTrackMap] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [tracks, setTracks] = useState([]); // array of track objects from iTunes
 
   useEffect(() => {
     if (!album) return;
-    setLoading(true);
-    searchAlbumTracks(album.artist, album.title)
-      .then(map => {
-        setTrackMap(map || {});
-        setLoading(false);
-      })
-      .catch(() => {
-        setTrackMap({});
-        setLoading(false);
-      });
+    searchAlbumTracks(album.artist, album.title).then(result => {
+      setTracks(result || []);
+    });
   }, [album]);
 
   if (!album) {
@@ -49,29 +72,18 @@ const AlbumDetail = () => {
         </div>
 
         <div className="tracklist">
-          {loading ? (
-            Array(album.songs.length).fill(0).map((_, i) => (
-              <div key={i} className="track-row skeleton">
-                <div className="skeleton-number"></div>
-                <div className="skeleton-title"></div>
-                <div className="skeleton-duration"></div>
-              </div>
-            ))
-          ) : (
-            album.songs.map((song, index) => {
-              const normalized = song.title.toLowerCase().replace(/[^\w\s]/g, '').trim();
-              const previewUrl = trackMap?.[normalized] || null;
-              return (
-                <AudioPreview
-                  key={index}
-                  song={song}
-                  albumArtist={album.artist}
-                  index={index}
-                  previewUrl={previewUrl}
-                />
-              );
-            })
-          )}
+          {album.songs.map((song, index) => {
+            const previewUrl = findBestMatch(song.title, tracks);
+            return (
+              <AudioPreview
+                key={index}
+                song={song}
+                albumArtist={album.artist}
+                index={index}
+                previewUrl={previewUrl}
+              />
+            );
+          })}
         </div>
       </div>
     </div>
