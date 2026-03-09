@@ -4,46 +4,15 @@ import { albums } from '../data/catalog';
 import AudioPreview from '../components/AudioPreview';
 import { searchAlbumTracks } from '../services/itunes';
 
-// Helper to find the best matching track preview
-const findBestMatch = (songTitle, tracks) => {
-  if (!tracks || tracks.length === 0) return null;
-
-  const normalizedSong = songTitle.toLowerCase().replace(/[^\w\s]/g, '').trim();
-
-  // 1. Exact match
-  for (let track of tracks) {
-    if (track.normalizedTitle === normalizedSong) {
-      return track.previewUrl;
-    }
-  }
-
-  // 2. Song title is contained in track title (e.g., "Black Hole Sun" in "Black Hole Sun (Remastered)")
-  for (let track of tracks) {
-    if (track.normalizedTitle.includes(normalizedSong)) {
-      return track.previewUrl;
-    }
-  }
-
-  // 3. Track title is contained in song title (unlikely but possible)
-  for (let track of tracks) {
-    if (normalizedSong.includes(track.normalizedTitle)) {
-      return track.previewUrl;
-    }
-  }
-
-  // 4. No match
-  return null;
-};
-
 const AlbumDetail = () => {
   const { id } = useParams();
   const album = albums.find(a => a.id === id);
-  const [tracks, setTracks] = useState([]); // array of track objects from iTunes
+  const [trackMap, setTrackMap] = useState({});
 
   useEffect(() => {
     if (!album) return;
-    searchAlbumTracks(album.artist, album.title).then(result => {
-      setTracks(result || []);
+    searchAlbumTracks(album.artist, album.title).then(map => {
+      setTrackMap(map || {});
     });
   }, [album]);
 
@@ -73,7 +42,9 @@ const AlbumDetail = () => {
 
         <div className="tracklist">
           {album.songs.map((song, index) => {
-            const previewUrl = findBestMatch(song.title, tracks);
+            // Normalize the song title to match the map keys
+            const normalized = song.title.toLowerCase().replace(/[^\w\s]/g, '').trim();
+            const previewUrl = trackMap[normalized] || null;
             return (
               <AudioPreview
                 key={index}
