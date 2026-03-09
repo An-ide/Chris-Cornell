@@ -50,7 +50,6 @@ const AlbumDetail = () => {
 
         <div className="tracklist">
           {loading ? (
-            // Show skeleton loaders while fetching
             Array(album.songs.length).fill(0).map((_, i) => (
               <div key={i} className="track-row skeleton">
                 <div className="skeleton-number"></div>
@@ -60,9 +59,8 @@ const AlbumDetail = () => {
             ))
           ) : (
             album.songs.map((song, index) => {
-              // Normalize song title for matching
-              const normalizedSong = song.title.toLowerCase().replace(/[^\w\s]/g, '');
-              const previewUrl = trackMap?.[normalizedSong] || null;
+              const normalized = song.title.toLowerCase().replace(/[^\w\s]/g, '').trim();
+              const previewUrl = trackMap?.[normalized] || null;
               return (
                 <AudioPreview
                   key={index}
